@@ -1,0 +1,48 @@
+#ifndef MEL_SPEC_GUARD
+#define MEL_SPEC_GUARD
+
+#include "arm_math.h"
+
+#define PRE_PROECESSING_MAX
+#define LOG_EPS 1e-10f
+
+{%- set values_per_line = 8 %}
+
+/* samplerate={{feature_obj.samplerate}}, fmin={{feature_obj.fmin}}, fmax={{feature_obj.fmax}} */
+
+const size_t nb_mels={{feature_obj.nb_mels}};
+const size_t window_len={{feature_obj.window_len}}; // win_length = n_fft
+const size_t hop_size={{feature_obj.window_stride}};
+
+arm_rfft_fast_instance_f32 fft_istance;
+
+// Truncated mel filterbanks
+
+const float mel_filter_pos[{{feature_obj.nb_mels}}] = {
+    {{ feature_obj.mel_filter_pos|join(',') }}
+};
+
+const float mel_filter_len[{{feature_obj.nb_mels}}] = {
+    {{ feature_obj.mel_filter_len|join(',') }}
+};
+
+const float mel_filter_coefs[{{feature_obj.mel_filter_coefs | length}}] = {
+{% for val in feature_obj.mel_filter_coefs -%}
+        {{ "%.6f"|format(val) }}f{{ "," if not loop.last }}
+        
+        {%- if (loop.index0 + 1) % values_per_line == 0 and not loop.last %}
+{% endif -%}
+{%- endfor %}
+};
+
+
+// Hann window generated using scipy.signal.windows.hann
+const float hann[{{feature_obj.window_len}}]={
+{% for val in feature_obj.hann_window -%}
+    {{ "%.6f"|format(val) }}f{{ "," if not loop.last }}
+    
+    {%- if (loop.index0 + 1) % values_per_line == 0 and not loop.last %}
+{% endif -%}
+{%- endfor %}
+};
+#endif

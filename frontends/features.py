@@ -1,20 +1,17 @@
-import os
 import librosa
 import numpy as np
-import pandas as pd
 import cmsisdsp as dsp
 from scipy.signal import butter, windows
 from numpy.lib.stride_tricks import sliding_window_view
-
+LOG_EPS=1e-10
 
 # TODO for ESP
 
-# For AudioMoth
-## TODO stft and mels on AM
+# For devices running CMSIS-DSP 
 
-class MelCMSIS:
-
+class MelSpecCMSIS:
     def __init__(self, samplerate, window_len, window_stride, nb_mels, fmin, fmax):
+        self.name = f"MelSpecCMSIS_sr{samplerate}_win{window_len}_hop{window_stride}_mels{nb_mels}_fmin{fmin}_fmax{fmax}"
         self.samplerate = samplerate
         self.window_len = window_len
         self.window_stride = window_stride
@@ -22,13 +19,14 @@ class MelCMSIS:
         self.fmin = fmin
         self.fmax = fmax
 
-        self.hann_window = windows.hann(self.window_len)
         self.fft_istance = dsp.arm_rfft_fast_instance_f32()
-        init_STATUS = dsp.arm_rfft_fast_init_f32(self.fft_istance, self.window_len)
-        assert(init_STATUS==0)
+        init_STATUS = dsp.arm_rfft_fast_init_f32(self.fft_istance, window_len)
+        assert(not init_STATUS)
 
+        self.hann_window = windows.hann(window_len)
         self.mel_filter_pos, self.mel_filter_len, self.mel_filter_coefs = self._truncate_mels(samplerate, window_len, nb_mels, fmin, fmax)
-    
+
+
     @staticmethod
     def _truncate_mels(samplerate, window_len, nb_mels, fmin, fmax):
         '''
@@ -95,114 +93,118 @@ class MelCMSIS:
         
         mel_spec = self._apply_truncate_mels(cmsis_cmplx_power)
         
-        return dsp.arm_vlog_f32(mel_spec)
+        return dsp.arm_vlog_f32(mel_spec + LOG_EPS)
 
-    def cmsis_log_mel_spectogram(self, audio):
+    def feature(self, audio, standard=True):
         v = sliding_window_view(audio, self.window_len)[::self.window_stride]
         outs = []
         for row in v:
             outs.append(self._process_window(row))
-        return np.array(outs).T
-
-
-def mel_preprocess(y, sr=20480):
-    S = librosa.feature.melspectrogram(y=y, sr=sr, fmin=2000, fmax=10000, n_mels=32,hop_length=320, win_length=512)
-    db_S = librosa.power_to_db(S, ref=np.max)
-    return db_S
-
-def float_to_fixed_q31(x):
-    q31 = (x * (1 << 31)).astype(np.int64)  # use int64 to prevent overflow
-    q31 = np.clip(q31, -0x80000000, 0x7FFFFFFF)
-    return q31.astype(np.int32) 
-
-def fixed_q31_to_float(x):
-    return x / float(1 << 31)
-
-def float_to_fixed_q15(x):
-    return np.array(x*32768).astype(np.int16)
-
-def fixed_q15_to_fixed_q31(x):
-    return x.astype(int) << 16
-
-# Using CMSIS
-def sos_bandpass_filter(lowcut, highcut, fs, order=3):
-    nyquist = 0.5 * fs
-    low = lowcut / nyquist
-    high = highcut /  nyquist
-    sos = butter(order, [low, high], btype = 'band', output = 'sos')
-    return sos
-
-def sos_lowpass_filter(lowcut, fs, order=6):
-    nyquist = 0.5 * fs
-    low = lowcut / nyquist
-    sos = butter(order, low, btype = 'low', analog=False, output = 'sos')
-    return sos
-
-def get_cmsis_filter(sos):
-    numStages = sos.shape[0]
-    new_shape = numStages*(sos.shape[1] - 1)
-    pCoeffs=np.reshape(np.hstack((sos[:,:3],-sos[:,4:])), new_shape)
-    return numStages, pCoeffs
-
-def filter_cmsisdsp_f32(signal, numStages, pCoeffs):
-    # Initialize filter
-    biquad_cascade_instance = dsp.arm_biquad_cascade_df2T_instance_f32()
-    status = dsp.arm_biquad_cascade_df2T_init_f32(biquad_cascade_instance, numStages, pCoeffs, np.zeros(numStages*4))
-    # Apply filter
-    signal_filtered = dsp.arm_biquad_cascade_df2T_f32(biquad_cascade_instance, signal)
-    return signal_filtered
-
-def filter_cmsisdsp_q31(signal, numStages, pCoeffs):
-    postShift = np.uint8(2)
-    pCoeffs_q32 = float_to_fixed_q31(pCoeffs/4)
-
-    # Initialize filter
-    biquad_cascade_instance = dsp.arm_biquad_cas_df1_32x64_ins_q31()
-    
-    status = dsp.arm_biquad_cascade_df1_init_q31(biquad_cascade_instance, numStages, np.array(pCoeffs_q32, dtype=np.int32), np.zeros(numStages*4), postShift)
-    # Apply filter
-    signal_filtered = dsp.arm_biquad_cascade_df1_q31(biquad_cascade_instance, np.array(signal, dtype=np.int32))
-    return signal_filtered
-
-
-def cmsis_bands_preprocess(audio, samplerate, filter_cmsisdsp, band_ranges, band_order, low_order, q15, downsample_factor=128):
-    
-    features = []
-
-    if q15:
-        audio_16=float_to_fixed_q15(audio)
-        audio = fixed_q15_to_fixed_q31(audio_16)
-
-    low_sos = sos_lowpass_filter(lowcut=16, fs=samplerate//downsample_factor, order=low_order) #save for processing in C
-    low_numStages, low_pCoeffs = get_cmsis_filter(low_sos)
-
-
-    for lowcut, highcut in band_ranges:
-        # Band filtering
-        band_sos = sos_bandpass_filter(lowcut, highcut, fs=samplerate, order=band_order)
-        bands_numStages, bands_pCoeffs = get_cmsis_filter(band_sos) #save for processing in C
         
-        band_cmsidsp = filter_cmsisdsp(audio, numStages=bands_numStages, pCoeffs=bands_pCoeffs)
+        if standard:
+            return np.array(outs).T - 2*np.log(np.std(audio))
+        else:
+            return np.array(outs).T
 
-        # Getting envelope
-        ## Rectify
-        rectified_band = np.abs(band_cmsidsp)
 
-        ## Downsampling using Maxpooling with K=stride=downsample_factor
-        down_band = [np.max(rectified_band[i:i+downsample_factor]) for i in np.arange(0,rectified_band.shape[0],downsample_factor).astype(int)]
-        ## Low-pass filter
-        envelope = filter_cmsisdsp(down_band, numStages=low_numStages, pCoeffs=low_pCoeffs)
+class BandEnvelopeCMSIS:
+    def __init__(self, samplerate, band_ranges, q31, band_order=2, low_order=6, downsample_factor=128, lowcut=16):
+        self.name="BandEnvelopeCMSIS"
+        self.samplerate=samplerate
+        self.band_ranges=band_ranges
+        self.band_order=band_order
+        self.low_order=low_order
+        self.q31=q31 
+        self.downsample_factor=downsample_factor
+        self.lowcut=lowcut
 
-        normal_envelope = (envelope-np.mean(envelope))/np.std(envelope)
-        features.append(normal_envelope)
-    return np.array(features).T
+        if q31:
+            self.postShift = np.uint8(2)
 
-def load_features(folder, sample_files, feature, samplerate):
-    data = []
-    for file_name in sample_files:
-        if file_name.endswith('.wav'):
-            file_path = os.path.join(folder, file_name)
-            audio, sr = librosa.load(file_path, sr=samplerate)
-            data_sample = feature(audio, sr)
-            data.append(data_sample)
-    return np.array(data)
+        #Get DSP-CMSIS filters
+        low_sos = self.sos_lowpass_filter(lowcut=lowcut, fs=self.samplerate//self.downsample_factor, order=self.low_order) #save for processing in C
+        self.low_numStages, self.low_pCoeffs = self.get_cmsis_filter(low_sos)
+
+        if q31:
+            self.low_pCoeffs = dsp.arm_float_to_q31(self.low_pCoeffs/(1<<self.postShift))
+
+        self.band_filters_cmsis = []
+        
+        for lowcut, highcut in self.band_ranges:
+            band_sos = self.sos_bandpass_filter(lowcut, highcut, fs=self.samplerate, order=self.band_order)
+            bands_numStages, bands_pCoeffs = self.get_cmsis_filter(band_sos)
+            
+            if q31:
+                bands_pCoeffs = dsp.arm_float_to_q31(bands_pCoeffs/(1<<self.postShift))
+
+            self.band_filters_cmsis.append((bands_numStages, bands_pCoeffs))
+    
+    @staticmethod
+    def sos_bandpass_filter(lowcut, highcut, fs, order):
+        nyquist = 0.5 * fs
+        low = lowcut / nyquist
+        high = highcut /  nyquist
+        sos = butter(order, [low, high], btype = 'band', output = 'sos')
+        return sos
+    
+    @staticmethod
+    def sos_lowpass_filter(lowcut, fs, order=6):
+        nyquist = 0.5 * fs
+        low = lowcut / nyquist
+        sos = butter(order, low, btype = 'low', analog=False, output = 'sos')
+        return sos
+    
+    @staticmethod
+    def get_cmsis_filter(sos):
+        numStages = sos.shape[0]
+        new_shape = numStages*(sos.shape[1] - 1)
+        pCoeffs=np.reshape(np.hstack((sos[:,:3],-sos[:,4:])), new_shape)
+        return numStages, pCoeffs
+
+    def filter_cmsisdsp_f32(self,signal, numStages, pCoeffs):
+        # Initialize filter
+        biquad_cascade_instance = dsp.arm_biquad_cascade_df2T_instance_f32()
+        status = dsp.arm_biquad_cascade_df2T_init_f32(biquad_cascade_instance, numStages, pCoeffs, np.zeros(numStages*4))
+        assert(not status)
+        # Apply filter
+        signal_filtered = dsp.arm_biquad_cascade_df2T_f32(biquad_cascade_instance, signal)
+        return signal_filtered
+
+    def filter_cmsisdsp_q31(self,signal, numStages, pCoeffs):
+        # Initialize filter
+        biquad_cascade_instance = dsp.arm_biquad_cas_df1_32x64_ins_q31()
+        
+        status = dsp.arm_biquad_cascade_df1_init_q31(biquad_cascade_instance, numStages, np.array(pCoeffs, dtype=np.int32), np.zeros(numStages*4), self.postShift)
+        assert(not status)
+        
+        # Apply filter
+        signal_filtered = dsp.arm_biquad_cascade_df1_q31(biquad_cascade_instance, np.array(signal, dtype=np.int32))
+        return signal_filtered
+
+    def feature(self, audio):
+
+        filter_cmsisdsp = self.filter_cmsisdsp_q31 if self.q31 else self.filter_cmsisdsp_f32
+        
+        features = []
+
+        if self.q31:
+            audio_16=dsp.arm_float_to_q15(audio)  # simply because audio is fed in int16 (mostly unnecessary)
+            audio = dsp.arm_q15_to_q31(audio_16)
+
+        for bands_numStages, bands_pCoeffs in self.band_filters_cmsis:
+            band_cmsidsp = filter_cmsisdsp(audio, numStages=bands_numStages, pCoeffs=bands_pCoeffs)
+
+            # Getting envelope
+
+            ## Rectify
+            rectified_band = np.abs(band_cmsidsp)
+
+            ## Downsampling using Maxpooling with K=stride=downsample_factor
+            down_band = [np.max(rectified_band[i:i+self.downsample_factor]) for i in np.arange(0,rectified_band.shape[0],self.downsample_factor).astype(int)]
+            
+            ## Low-pass filter
+            envelope = filter_cmsisdsp(down_band, numStages=self.low_numStages, pCoeffs=self.low_pCoeffs)
+
+            normal_envelope = (envelope-np.mean(envelope))/np.std(envelope)
+            features.append(normal_envelope)
+        return np.squeeze(np.array(features).T)

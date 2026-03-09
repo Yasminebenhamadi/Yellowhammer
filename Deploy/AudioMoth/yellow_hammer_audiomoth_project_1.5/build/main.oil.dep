@@ -1,0 +1,10 @@
+main.oil: \
+ /Users/yasminebenhamadi/PhD/YellowHammer/AudioMoth/q15_source/trampoline/goil/templates/config/config.oil \
+ /Users/yasminebenhamadi/PhD/YellowHammer/AudioMoth/q15_source/trampoline/goil/templates/config/kernel.oil \
+ /Users/yasminebenhamadi/PhD/YellowHammer/AudioMoth/q15_source/trampoline/goil/templates/config/api.oil \
+ /Users/yasminebenhamadi/PhD/YellowHammer/AudioMoth/q15_source/trampoline/goil/templates/config/api_ioc.oil \
+ /Users/yasminebenhamadi/PhD/YellowHammer/AudioMoth/q15_source/trampoline/goil/templates/config/cortex-m/config.oil \
+ /Users/yasminebenhamadi/PhD/YellowHammer/AudioMoth/q15_source/trampoline/goil/templates/config/cortex-m/armv7em/config.oil \
+ /Users/yasminebenhamadi/PhD/YellowHammer/AudioMoth/q15_source/trampoline/goil/templates/config/cortex-m/armv7em/buildOptions.oil \
+ /Users/yasminebenhamadi/PhD/YellowHammer/AudioMoth/q15_source/trampoline/goil/templates/config/cortex-m/armv7em/efm32wg/config.oil \
+ /Users/yasminebenhamadi/PhD/YellowHammer/AudioMoth/q15_source/trampoline/goil/templates/config/config2.5.oil

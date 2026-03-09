@@ -1,0 +1,197 @@
+
+{
+  "alarm" : [],
+  "event" : 
+  [
+    
+    {
+      "MASK" : 1,
+      "NAME" : "ev_NORMALIZE",
+      "REF" : 1
+    },    
+    {
+      "MASK" : 1,
+      "NAME" : "ev_write_audio",
+      "REF" : 1
+    },    
+    {
+      "MASK" : 1,
+      "NAME" : "ev_DMAtoSRAM",
+      "REF" : 1
+    }
+  ],
+  "ioc" : [],
+  "isr" : 
+  [
+    
+    {
+      "CATEGORY" : 2,
+      "KIND" : "ISR",
+      "NAME" : "isr_dma",
+      "PRIORITY" : 16,
+      "SOURCE" : "DMA_IRQ",
+      "STACKSIZE" : 384,
+      "USEFLOAT" : "false"
+    },    
+    {
+      "CATEGORY" : 2,
+      "KIND" : "ISR",
+      "NAME" : "isr_rtc",
+      "PRIORITY" : 14,
+      "SOURCE" : "RTC_IRQ",
+      "STACKSIZE" : 384,
+      "USEFLOAT" : "false"
+    }
+  ],
+  "message" : [],
+  "resource" : [],
+  "task" : 
+  [
+    
+    {
+      "ACTIVATION" : 1,
+      "AUTOSTART" : "false",
+      "EVENT" : 
+      [
+        
+        {
+          "VALUE" : "ev_write_audio"
+        }
+      ],
+      "KIND" : "Task",
+      "NAME" : "write_audio",
+      "NONPREEMPTABLE" : "false",
+      "PRIORITY" : 2,
+      "SCHEDULE" : "FULL",
+      "STACKSIZE" : 1024,
+      "USEFLOAT" : "false",
+      "USEINTERNALRESOURCE" : "false"
+    },    
+    {
+      "ACTIVATION" : 1,
+      "AUTOSTART" : "false",
+      "EVENT" : 
+      [
+        
+        {
+          "VALUE" : "ev_NORMALIZE"
+        }
+      ],
+      "KIND" : "Task",
+      "NAME" : "inference",
+      "NONPREEMPTABLE" : "false",
+      "PRIORITY" : 3,
+      "SCHEDULE" : "FULL",
+      "STACKSIZE" : 1024,
+      "USEFLOAT" : "true",
+      "USEINTERNALRESOURCE" : "false"
+    },    
+    {
+      "ACTIVATION" : 1,
+      "AUTOSTART" : "true",
+      "AUTOSTART_S" : 
+      {
+        "APPMODE" : 
+        [
+          
+          {
+            "VALUE" : "Std"
+          }
+        ]
+      },
+      "EVENT" : 
+      [
+        
+        {
+          "VALUE" : "ev_DMAtoSRAM"
+        }
+      ],
+      "KIND" : "Task",
+      "NAME" : "copyDMAtoSRAM",
+      "NONPREEMPTABLE" : "false",
+      "PRIORITY" : 4,
+      "SCHEDULE" : "FULL",
+      "STACKSIZE" : 512,
+      "USEFLOAT" : "true",
+      "USEINTERNALRESOURCE" : "false"
+    },    
+    {
+      "ACTIVATION" : 1,
+      "AUTOSTART" : "false",
+      "KIND" : "Task",
+      "NAME" : "start_dma",
+      "NONPREEMPTABLE" : "false",
+      "PRIORITY" : 1,
+      "SCHEDULE" : "FULL",
+      "STACKSIZE" : 384,
+      "USEFLOAT" : "false",
+      "USEINTERNALRESOURCE" : "false"
+    },    
+    {
+      "ACTIVATION" : 1,
+      "AUTOSTART" : "true",
+      "AUTOSTART_S" : 
+      {
+        "APPMODE" : 
+        [
+          
+          {
+            "VALUE" : "Std"
+          }
+        ]
+      },
+      "KIND" : "Task",
+      "NAME" : "start_audio",
+      "NONPREEMPTABLE" : "false",
+      "PRIORITY" : 1,
+      "SCHEDULE" : "FULL",
+      "STACKSIZE" : 512,
+      "USEFLOAT" : "true",
+      "USEINTERNALRESOURCE" : "false"
+    },    
+    {
+      "ACTIVATION" : 1,
+      "AUTOSTART" : "true",
+      "AUTOSTART_S" : 
+      {
+        "APPMODE" : 
+        [
+          
+          {
+            "VALUE" : "Std"
+          }
+        ]
+      },
+      "KIND" : "Task",
+      "NAME" : "setup_inference",
+      "NONPREEMPTABLE" : "false",
+      "PRIORITY" : 4,
+      "SCHEDULE" : "FULL",
+      "STACKSIZE" : 1024,
+      "USEFLOAT" : "true",
+      "USEINTERNALRESOURCE" : "false"
+    },    
+    {
+      "ACTIVATION" : 1,
+      "AUTOSTART" : "true",
+      "AUTOSTART_S" : 
+      {
+        "APPMODE" : 
+        [
+          
+          {
+            "VALUE" : "Std"
+          }
+        ]
+      },
+      "KIND" : "Task",
+      "NAME" : "start_sdcard",
+      "NONPREEMPTABLE" : "false",
+      "PRIORITY" : 4,
+      "SCHEDULE" : "FULL",
+      "STACKSIZE" : 384,
+      "USEFLOAT" : "false",
+      "USEINTERNALRESOURCE" : "false"
+    }
+  ]
+}

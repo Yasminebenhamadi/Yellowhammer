@@ -1,0 +1,11 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "set-rtc-time",
+        "type": "shell",
+        "command": "./generate_rtc_gdb_command.sh",
+        "problemMatcher": []
+      }
+    ]
+  }

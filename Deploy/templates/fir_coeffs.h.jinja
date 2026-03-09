@@ -1,0 +1,49 @@
+#ifndef FIR_COEFFS_GUARD
+#define FIR_COEFFS_GUARD
+
+#include "arm_math.h"
+
+#define PRE_PROCESSING_MAX
+
+/* samplerate={{feature_obj.samplerate}}, downsample_factor={{feature_obj.downsample_factor}} */
+
+{%- set filters_type = "q31_t" if feature_obj.q31 else "float32_t" %}
+{%- set type_str = "Q31" if feature_obj.q31 else "F31" %}
+
+{% if feature_obj.q31 %}
+const int8_t postShift = {{feature_obj.postShift}};
+{%- endif %}
+
+/* SOS Lowpass filter with order={{feature_obj.low_order}} and lowcut={{feature_obj.lowcut}} */
+const {{filters_type}} firCoef{{type_str}}_low [{{feature_obj.low_numStages}}*{{ (feature_obj.low_pCoeffs | length) // feature_obj.low_numStages }}] = {
+{%- for coeff in feature_obj.low_pCoeffs %}
+    {% if feature_obj.q31 -%}
+        {{ coeff | round | int }} 
+    {%- else -%}
+        {{ "%.6f"|format(coeff) }}f
+    {%- endif -%}{{ "," if not loop.last }}
+{%- endfor %}
+};
+
+/* SOS Bandpass filters with order={{feature_obj.band_order}} */
+
+{% for band_filter in feature_obj.band_filters_cmsis -%}
+{%- set stages = band_filter[0] -%}
+{%- set order = (band_filter[1] | length) // stages -%}
+{%- set low_high = feature_obj.band_ranges[loop.index0]-%}
+
+// freq_low={{low_high[0]}}, freq_high={{low_high[1]}}
+const {{ filters_type }} firCoef{{ type_str }}_band{{ loop.index0 +1}} [{{ stages}}*{{order }}] = {
+{%- for coeff in band_filter[1] %}
+    {% if feature_obj.q31 -%}
+        {{ coeff | round | int }} 
+    {%- else -%}
+        {{ "%.6f"|format(coeff) }}f
+    {%- endif -%}{{ "," if not loop.last }}
+
+{%- endfor %}
+};
+
+{% endfor %}
+
+#endif

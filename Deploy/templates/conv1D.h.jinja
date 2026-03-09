@@ -1,0 +1,145 @@
+#ifndef BLOCK_CONV1D_GUARD
+#define BLOCK_CONV1D_GUARD
+
+#include "arm_math.h"
+#include "arm_nnfunctions.h"
+
+// CONV1D params
+
+{%- set audio_length = 30720 %}
+
+/* Calculated for audio segments of {{audio_length}} samples */
+
+{%- set padding = feature_obj.get_padding(audio_length) %}
+
+const int32_t pad_left        = {{padding[0]}};
+const int32_t pad_right       = {{padding[1]}};
+
+const int32_t BATCH        = 1;
+
+const int32_t INPUT_LEN    = 1024;
+const int32_t INPUT_H      = 1;
+const int32_t IN_CH        = 1;
+
+const int32_t start_idx    = {{feature_obj.start_idx}};
+
+
+const int32_t OUT_CH       = {{feature_obj.nb_filters}};
+
+const int32_t KERNEL_H     = 1;
+const int32_t STRIDE_H     = 1;
+
+const int32_t KERNEL_W     = {{feature_obj.kernel_len}};
+const int32_t STRIDE_W     = {{feature_obj.stride}};
+
+const int32_t OUTPUT_H     = 1; 
+const int32_t OUTPUT_W     = (INPUT_LEN - KERNEL_W) / STRIDE_W + 1;
+
+const int32_t pool_H     	= 1; 
+const int32_t pool_W     	= 4; // stride=length
+
+const int32_t POOLED_H   	= 1;
+const int32_t POOLED_W   	= OUTPUT_W / pool_W;
+
+// No bias (TODO add later version for bias params)
+const cmsis_nn_bias_data bias_data_cmsis = { NULL, false };
+const cmsis_nn_dims bias_dims = {0,0,0,0};
+
+// --- CMSIS-NN dimension structs ---
+const cmsis_nn_dims input_dims = {
+    /*[N, H, W, C_IN]*/
+	.n = BATCH,
+	.h = INPUT_H,
+	.w = INPUT_LEN,
+	.c = IN_CH
+};
+const cmsis_nn_dims filter_dims = {
+    /*[C_OUT, HK, WK, C_IN]*/
+	.n = OUT_CH,
+	.h = KERNEL_H,
+	.w = KERNEL_W,
+	.c = IN_CH
+};
+
+const cmsis_nn_dims output_dims = {
+    /*[N, H, W, C_OUT]*/
+	.n = BATCH,
+	.h = OUTPUT_H,
+	.w = OUTPUT_W,
+	.c = OUT_CH
+};
+
+const cmsis_nn_conv_params conv_params = {
+    .input_offset = 0,
+	.output_offset = 0,
+    .stride  = {STRIDE_W, STRIDE_H},
+	.padding = {0,0},
+	.dilation = {1, 1},
+	.activation = {.min = -32768, .max = 32767}
+};
+
+/* AveragePooling1D params */
+
+const cmsis_nn_pool_params pool_params = {
+	.stride = {pool_W, pool_H},
+	.padding = {0,0},
+	.activation = {.min = -32768, .max = 32767}
+};
+
+const cmsis_nn_dims pool_filter_dims = {
+	/* [H, W] Argument N and C are not used */
+	.n = 0,
+	.h = pool_H, 
+	.w = pool_W, 
+	.c = 0
+};
+
+const cmsis_nn_dims pool_input_dims = {
+	/* [H, W, C_IN] Argument 'N' is not used */
+	.n = 0,
+	.h = OUTPUT_H,
+	.w = OUTPUT_W,
+	.c = OUT_CH
+};
+
+const cmsis_nn_dims pool_output_dims = {
+	/* [H, W, C_OUT=C_IN] Argument 'N' is not used*/
+	.n = 0,
+	.h = POOLED_H,
+	.w = POOLED_W,
+	.c = OUT_CH
+};
+
+
+// TODO fix filter_data and quant_params
+const cmsis_nn_per_channel_quant_params quant_params = { NULL, NULL };
+
+{%- set values_per_line =feature_obj.kernel_len %}
+
+const int8_t filter_data[1 * {{feature_obj.nb_filters}} * {{feature_obj.kernel_len}}] = {
+{% for kernel in feature_obj.kernels -%}
+    {%- set pos = loop.index %}
+    {%- for val in kernel -%}
+        {{ val | round | int }}{{ "," if not loop.last}}{{ "," if pos!=feature_obj.nb_filters and loop.last}}
+    {%- endfor %}
+{% endfor -%}
+}; 
+
+// --- Context buffer ---
+const int32_t conv_buf_size = 0; //TODO
+uint8_t conv_buffer[0]; //TODO
+cmsis_nn_context conv_ctx = {
+	.buf = conv_buffer,
+	.size = conv_buf_size
+};
+
+
+// --- Context buffer ---
+const int32_t pool_buf_size = 0; //TODO
+uint8_t pool_buffer[0]; //TODO
+cmsis_nn_context pool_ctx = {
+	.buf = pool_buffer,
+	.size = pool_buf_size
+};
+
+#endif

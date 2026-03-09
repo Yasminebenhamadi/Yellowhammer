@@ -1,0 +1,29 @@
+{
+    "version": "0.2.0",
+    "logging": {
+        "engineLogging": true
+    },
+    "configurations": [
+        {
+            "name": "Debug AudioMoth",
+            "cwd": "${workspaceFolder}",
+            "executable": "./build/main_exe",
+            "request": "launch",
+            "type": "cortex-debug",
+            "servertype": "openocd",
+            "interface": "swd",
+            "configFiles": [
+                "interface/cmsis-dap.cfg",
+                "target/efm32.cfg"
+            ],
+            "armToolchainPath": "/Applications/ARM/bin/",
+            "device": "EFM32WG280F256",
+            "svdFile": "${workspaceFolder}/svd/EFM32WG280F256.svd",
+            "showDevDebugOutput": "raw",
+            "preLaunchTask": "set-rtc-time",
+            "postLaunchCommands": [
+                "source set_timekeeper.gdb"
+            ]
+        },
+    ]
+}

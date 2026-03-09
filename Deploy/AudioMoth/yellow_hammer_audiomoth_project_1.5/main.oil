@@ -1,0 +1,154 @@
+OIL_VERSION = "2.5";
+
+IMPLEMENTATION trampoline {
+
+    /* This fix the default STACKSIZE of tasks */
+    TASK {
+        UINT32 STACKSIZE = 256 ;
+    } ;
+
+    /* This fix the default STACKSIZE of ISRs */
+    ISR {
+        UINT32 STACKSIZE = 384 ;
+    } ;
+};
+
+CPU blink {
+  OS config {
+    STATUS = EXTENDED;
+    PAINT_STACK = TRUE;
+    PAINT_REGISTERS = TRUE;
+    BUILD = TRUE {
+      TRAMPOLINE_BASE_PATH = "/Users/yasminebenhamadi/PhD/YellowHammer/AudioMoth/q15_source/trampoline";
+      APP_SRC = "main.c";
+      APP_CPPSRC = "model/Band_int8_model.cc";
+      APP_CPPSRC = "inference.cpp";
+      APP_NAME = "main_exe";
+      LIBRARY = dmactrl;
+      LIBRARY = microsd;
+      LIBRARY = cmsisdsp;
+      LIBRARY = cmsisnn;
+      LIBRARY = tflite;
+      CFLAGS  = "-Os -DEFM32WG380F256=1";
+      CPPFLAGS = "-Os -DEFM32WG380F256=1";
+      CPPFLAGS = "-std=c++17";
+      // Define for TFLM
+      CPPFLAGS = "-DTF_LITE_STATIC_MEMORY -DTF_LITE_DISABLE_X86_NEON -DNDEBUG";
+      CPPFLAGS = "-DCMSIS_NN -DKERNELS_OPTIMIZED_FOR_SPEED";
+      CPPFLAGS = "-DTF_LITE_MCU_DEBUG_LOG -DTF_LITE_STRIP_ERROR_STRINGS";
+      // Flags same as tflite-micro example with cortex-m4
+      CPPFLAGS = "-Wnon-virtual-dtor";
+      CPPFLAGS = "-fno-unwind-tables";
+      CPPFLAGS = "-fno-use-cxa-atexit";
+      CPPFLAGS = "-fno-asynchronous-unwind-tables";
+      CPPFLAGS = "-Wsign-compare -Wdouble-promotion -Wunused-variable -Wunused-function -Wswitch -Wvla -Wall -Wextra -Wmissing-field-initializers -Wstrict-aliasing -Wno-unused-parameter"; 
+      CPPFLAGS = "-mlittle-endian -Wno-type-limits -Wno-unused-private-field";
+      CPPFLAGS = "-fomit-frame-pointer";
+      // Linker flags
+      LDFLAGS = "-Map=main.map";
+      LDFLAGS = "--print-memory-usage";
+      COMPILER = "arm-none-eabi-gcc";
+      CPPCOMPILER = "arm-none-eabi-g++";
+      ASSEMBLER = "arm-none-eabi-as";
+      LINKER = "arm-none-eabi-ld";
+      COPIER = "arm-none-eabi-objcopy";
+      SYSTEM = CMAKE {VSCODE=TRUE;};
+    };
+    SYSTEM_CALL = TRUE;
+    MEMMAP = TRUE {
+      COMPILER = gcc;
+      LINKER = gnu_ld { SCRIPT = "script.ld"; };
+      ASSEMBLER = gnu_as;
+    };
+  };
+
+  APPMODE Std {};
+
+  TASK start_sdcard {
+    PRIORITY = 5;
+    AUTOSTART = TRUE {APPMODE = Std;};
+    ACTIVATION = 1;
+    SCHEDULE = FULL;
+    STACKSIZE = 384;
+  };
+
+  TASK start_audio {
+    PRIORITY = 2;
+    AUTOSTART = TRUE {APPMODE = Std;};
+    ACTIVATION = 1;
+    SCHEDULE = FULL;
+    STACKSIZE = 512;
+    USEFLOAT = TRUE;
+  };
+
+  TASK start_dma {
+    PRIORITY = 2;
+    AUTOSTART = FALSE;
+    ACTIVATION = 1;
+    SCHEDULE = FULL;
+    STACKSIZE = 384;
+  };
+
+  EVENT ev_NORMALIZE {
+    MASK = AUTO;
+  };
+
+  TASK inference {
+    PRIORITY = 4;
+    AUTOSTART = FALSE;
+    ACTIVATION = 1;
+    SCHEDULE = FULL;
+    STACKSIZE = 1024;
+    EVENT = ev_NORMALIZE;
+    USEFLOAT = TRUE;
+  };
+
+  TASK copyDMAtoSRAM {
+    PRIORITY = 5;
+    AUTOSTART = TRUE {APPMODE = Std;};
+    ACTIVATION = 1;
+    SCHEDULE = FULL;
+    EVENT = ev_DMAtoSRAM;
+    STACKSIZE = 512;
+    USEFLOAT = TRUE;
+  };
+
+  EVENT ev_DMAtoSRAM {
+    MASK = AUTO;
+  };
+
+
+  TASK setup_inference {
+    PRIORITY = 5;
+    AUTOSTART = TRUE {APPMODE = Std;};
+    ACTIVATION = 1;
+    SCHEDULE = FULL;
+    STACKSIZE = 1024;
+    USEFLOAT = TRUE;
+  };
+
+  TASK write_audio {
+    PRIORITY = 3;
+    AUTOSTART = FALSE;
+    ACTIVATION = 1;
+    SCHEDULE = FULL;
+    STACKSIZE = 1024;
+    EVENT = ev_write_audio;
+  };
+
+  EVENT ev_write_audio {
+    MASK = AUTO;
+  };
+
+  ISR isr_dma {
+    CATEGORY = 2;
+    PRIORITY = 2;
+    SOURCE = DMA_IRQ;
+  };
+
+  ISR isr_rtc {
+    CATEGORY = 2;
+    PRIORITY = 1;
+    SOURCE = RTC_IRQ;
+  };
+};
