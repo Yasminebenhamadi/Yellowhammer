@@ -121,12 +121,13 @@ def get_X(folder, clip=1.5):
 
 if __name__ == "__main__":
 
-    week_name="March"
-    week="March/"
-    vizina_folder="/Volumes/LaCie/Vizina/OG/"+week
+    week_name="April"
+    week=week_name+"/"
+    #vizina_folder="/Volumes/LaCie/Vizina/OG/"+week
+    vizina_folder="/Volumes/LaCie/Yellowhammer/PAM/"+week
     output_folder="eval_utils/results/"
 
-    id_AM=1
+    id_AM=35 #April AM1 to redo
     subfolder="AM"+str(id_AM)+"/"
 
     input_folder=os.path.join(vizina_folder, subfolder)

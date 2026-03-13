@@ -83,17 +83,21 @@ def goertzel_scores(goertzel_values, window_length):
     
     index=0
     scores = []
+    all_scores=[]
     for trigger in range(nb_goertzel_triggers):
         limit = min(len(goertzel_values), int(index + goertzel_buffer_length)) 
         trigger_values = goertzel_values[index:limit]
         scores.append(np.max(trigger_values))
+        all_scores.extend(trigger_values)
         index = limit
-    return scores
+    return scores, all_scores
 
 def goertzel_inference(X, sr, center_freq = 5500, window_len = 32):
     y_scores = []
+    resp_all_scores=[]
     for sample in X:
         goertzel_values = apply_goertzel_filter(sample.flatten(), sr, center_freq, window_len)
-        score = goertzel_scores(goertzel_values, window_len)
+        score, all_scores = goertzel_scores(goertzel_values, window_len)
         y_scores.append(score)
-    return np.array(y_scores)
+        resp_all_scores.extend(all_scores)
+    return np.array(y_scores), resp_all_scores

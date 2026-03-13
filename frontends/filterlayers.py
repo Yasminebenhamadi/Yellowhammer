@@ -83,12 +83,15 @@ class GaborConv1D(tf.keras.layers.Layer):
     def build(self, input_shape):
         # center frequency and bandwidth params (learnable)
         mel_freqs, bandwidths = self.init_from_mels(fmin=3000, fmax=10000)
+        print('init:', mel_freqs)
+        print('mel bands:', bandwidths)
         self.center_hz = self.add_weight(
             shape=(self.out_channels,),
             initializer=tf.keras.initializers.Constant(mel_freqs),
-            #initializer=tf.keras.initializers.RandomUniform(minval=2000, maxval=self.fs/2),
+            #initializer=tf.keras.initializers.RandomUniform(minval=900, maxval=10000),
             trainable=True,
             dtype=tf.float32,
+            #constraint=ClipConstraint(1000, 10000)
         )
         self.bandwidth = self.add_weight(
             shape=(self.out_channels,),
